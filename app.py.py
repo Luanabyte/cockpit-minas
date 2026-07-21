@@ -165,19 +165,32 @@ else:
 st.sidebar.title("Opções")
 st.sidebar.info("Utilize este espaço para filtros secundários ou navegação futura.")
 
-st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
-
 df_prod['data'] = df_prod['data'].fillna('Sem Data').astype(str)
 datas_disponiveis = sorted([d for d in df_prod['data'].unique() if d != 'Sem Data' and d.strip() != ''], reverse=True)
 
-col_vazia1, col_filtro, col_vazia2 = st.columns([1, 1, 1])
-with col_filtro:
-    if len(datas_disponiveis) > 0:
-        data_selecionada = st.selectbox("Selecione a Data:", datas_disponiveis, label_visibility="collapsed")
-    else:
-        st.warning("Nenhuma data encontrada na aba prod.")
-        data_selecionada = "Nenhuma"
+if len(datas_disponiveis) > 0:
+    data_selecionada = st.sidebar.selectbox("Selecione a Data:", datas_disponiveis)
+else:
+    st.sidebar.warning("Nenhuma data encontrada na aba prod.")
+    data_selecionada = "Nenhuma"
 
+# Adding Cockpit to top right using CSS absolute positioning
+st.markdown("""
+    <style>
+        .cockpit-title {
+            position: absolute;
+            top: -50px;
+            right: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #777;
+            letter-spacing: 2px;
+        }
+    </style>
+    <div class="cockpit-title">COCKPIT</div>
+""", unsafe_allow_html=True)
+
+st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
 st.markdown("<br><br>", unsafe_allow_html=True)
 
 df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
@@ -220,19 +233,20 @@ col_graf1, col_graf2 = st.columns(2)
 with col_graf1:
     st.subheader("🔥 Top 5 Produtividade (Packing)")
     if not df_prod_filtered.empty:
-        df_prod_filtered = df_prod_filtered.copy()
-        df_prod_filtered['total_packing'] = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce')
-        # Filtra nulos e zeros para evitar erro no gráfico de barras
-        df_prod_valid = df_prod_filtered[df_prod_filtered['total_packing'] > 0]
+        df_prod_chart = df_prod_filtered.copy()
+        # Force numeric, replacing errors with NaN, then drop NaNs
+        df_prod_chart['total_packing'] = pd.to_numeric(df_prod_chart['total_packing'], errors='coerce')
+        df_prod_chart = df_prod_chart.dropna(subset=['total_packing'])
+        df_prod_chart = df_prod_chart[df_prod_chart['total_packing'] > 0]
         
-        if not df_prod_valid.empty:
-            top5 = df_prod_valid.nlargest(5, 'total_packing')
+        if not df_prod_chart.empty:
+            top5 = df_prod_chart.nlargest(5, 'total_packing')
             fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
                          text='total_packing', color_discrete_sequence=['#EE4D2D'])
             fig1.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="THP", yaxis_title="")
             st.plotly_chart(fig1, use_container_width=True)
         else:
-            st.info("Todos os valores de total_packing são zero ou nulos para esta data.")
+            st.info("Todos os valores de total_packing são zero ou inválidos para esta data.")
     else:
         st.info("Sem dados para listar o ranking.")
 
