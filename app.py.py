@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
 
 try:
     from streamlit_gsheets import GSheetsConnection
@@ -15,7 +14,7 @@ st.set_page_config(
     page_title="Shipping Central | Operações",
     page_icon="📦",
     layout="wide",
-    initial_sidebar_state="expanded" 
+    initial_sidebar_state="collapsed" 
 )
 
 def check_secrets():
@@ -55,7 +54,13 @@ def load_real_data():
 @st.cache_data
 def load_mock_data():
     dates = ['2026-07-21'] * 20
-    df_act = pd.DataFrame({'data': dates, 'total_manhr': [8]*20, 'total_shipments': [100]*20})
+    df_act = pd.DataFrame({
+        'data': dates, 
+        'operator_id': [f'ops{i}' for i in range(20)],
+        'workstation_name': ['P1_AU01', 'SORT_GER', 'BREAK_MEAL', 'PS_SHIPP', 'AU_02'] * 4,
+        'total_manhr': [8]*20, 
+        'last_checkout': ['Em aberto', 'Em aberto', 'Em aberto', '2026-07-21 10:00:00', 'Em aberto'] * 4
+    })
     df_pck = pd.DataFrame({'data': dates, 'size_type': ['M']*20, 'thp': [100]*20})
     df_idl = pd.DataFrame({'data': dates, 'idle_horas_decimal': [1]*20})
     df_sla = pd.DataFrame({'last_status': ['SOC_Packing']*16 + ['SOC_Packed']*4})
@@ -78,13 +83,16 @@ def load_mock_data():
     
     return df_act, df_pck, df_idl, df_sla, df_prod, df_dmo
 
+# ==========================================
+# CSS CUSTOMIZADO (AZUL ESCURO, LARANJA E CARDS)
+# ==========================================
 st.markdown("""
 <style>
-    /* Esconde barra padrão do Streamlit */
+    /* Ocultar header padrão */
     header {visibility: hidden;}
     .block-container {padding-top: 1rem; padding-bottom: 0rem; max-width: 98%;}
     
-    /* Personalização da Barra Lateral - AZUL ESCURO */
+    /* Barra Lateral Azul Escuro */
     [data-testid="stSidebar"] {
         background-color: #0d1b2a !important;
     }
@@ -92,63 +100,88 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* Título SHIPPING no Topo */
+    /* Títulos Principais */
     .shopee-title {
         text-align: center;
-        color: #EE4D2D;
+        color: #0d1b2a;
         font-family: 'Arial Black', sans-serif;
-        font-size: 4.5rem;
+        font-size: 3.5rem;
         margin-top: -30px;
-        margin-bottom: 10px;
+        margin-bottom: 0px;
         text-transform: uppercase;
         letter-spacing: 4px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    .cockpit-title {
+        text-align: right; 
+        color: #EE4D2D; 
+        font-weight: 900; 
+        font-size: 1.5rem; 
+        letter-spacing: 2px; 
+        margin-top: 10px;
     }
     
-    /* Customização Extrema dos Cards de Métricas */
+    /* Customização dos Cards Superiores (st.metric) */
     div[data-testid="metric-container"] {
         background-color: #ffffff;
-        border: 1px solid #f0f0f0;
-        border-top: 8px solid #EE4D2D;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
-        text-align: center;
+        border-left: 6px solid #EE4D2D;
+        border-radius: 8px;
+        padding: 15px 20px;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
     }
-    
-    /* Título do Card */
     div[data-testid="metric-container"] label {
-        font-size: 1.2rem !important;
-        color: #777 !important;
-        font-weight: bold;
-        justify-content: center;
+        font-size: 1.1rem !important;
+        color: #0d1b2a !important;
+        font-weight: 700;
         margin-bottom: 5px;
     }
-    
-    /* Valor numérico no Card */
     div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-        font-size: 4.5rem !important;
-        color: #EE4D2D !important;
+        font-size: 3rem !important;
+        color: #0d1b2a !important;
         font-weight: 900 !important;
-        justify-content: center;
-        line-height: 1.1;
+    }
+    
+    /* Mini-Cards de Alocação (Pessoinhas) */
+    .alloc-container {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        margin-top: 15px;
+        margin-bottom: 25px;
+    }
+    .alloc-card {
+        background-color: #0d1b2a;
+        color: #ffffff;
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 1.2rem;
+        border-bottom: 4px solid #EE4D2D;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+    }
+    .alloc-number {
+        font-size: 1.5rem;
+        color: #EE4D2D;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# CARREGAMENTO DE DADOS
+# ==========================================
 if USAR_DADOS_REAIS:
     try:
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_real_data()
     except Exception as e:
-        st.sidebar.error(f"Erro na conexão: {e}")
+        st.sidebar.error(f"Erro de permissão: Compartilhe a planilha com o e-mail do Service Account. Detalhe: {e}")
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 else:
-    st.sidebar.warning("Usando dados simulados.")
+    st.sidebar.warning("⚠️ Usando dados simulados. Preencha as senhas na nuvem.")
     df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 
 st.sidebar.title("Opções")
 
-# Limpeza e filtro de data para a barra lateral
 df_prod['data'] = df_prod['data'].fillna('Sem Data').astype(str)
 datas_disponiveis = sorted([d for d in df_prod['data'].unique() if d != 'Sem Data' and d.strip() != ''], reverse=True)
 
@@ -158,21 +191,23 @@ else:
     st.sidebar.warning("Nenhuma data encontrada na aba prod.")
     data_selecionada = "Nenhuma"
 
-st.sidebar.info("Utilize este espaço para filtros secundários ou navegação futura.")
-
-# Topo: COCKPIT e SHIPPING usando colunas para garantir posicionamento correto
+# ==========================================
+# TOPO DA PÁGINA (TÍTULOS)
+# ==========================================
 col_topo1, col_topo2, col_topo3 = st.columns([1, 2, 1])
 with col_topo2:
     st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
 with col_topo3:
-    st.markdown('<div style="text-align: right; color: #777; font-weight: bold; font-size: 1.5rem; letter-spacing: 2px; margin-top: 10px;">COCKPIT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="cockpit-title">COCKPIT</div>', unsafe_allow_html=True)
 
+
+# ==========================================
+# CÁLCULOS DAS MÉTRICAS GERAIS
+# ==========================================
 df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
-
-# SOMA DO THP
 thp_total = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce').sum()
 
-# CALCULO DA META (DMO D16:D25)
+# Meta DMO
 try:
     if not df_dmo.empty and len(df_dmo) >= 25:
         coluna_meta = df_dmo.columns[3] if len(df_dmo.columns) > 3 else df_dmo.columns[-1]
@@ -181,80 +216,157 @@ try:
         meta_dia = 20000 
 except:
     meta_dia = 20000
+if pd.isna(meta_dia) or meta_dia == 0: meta_dia = 20000
 
-if meta_dia == 0 or pd.isna(meta_dia):
-    meta_dia = 20000 
-
+# Pendentes Packing
 pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
-headcount = df_prod_filtered['operador'].nunique() if not df_prod_filtered.empty else 0
 
-col_met1, col_met_principal, col_met3 = st.columns([1, 1.5, 1])
+# ==========================================
+# CÁLCULOS DE ALOCAÇÃO E HORAS (Aba raw_activity)
+# ==========================================
+df_activity['data'] = df_activity['data'].astype(str)
+df_act_filtered = df_activity[df_activity['data'] == data_selecionada].copy()
 
-with col_met1:
-    st.metric("Operadores (HC)", f"{headcount}")
-with col_met_principal:
-    st.metric("THP TOTAL", f"{thp_total:,.0f}")
-with col_met3:
-    st.metric("Pendente (Packing)", f"{pendentes}")
+# Total de Horas Trabalhadas no dia (Soma da Coluna J = total_manhr)
+horas_trabalhadas = pd.to_numeric(df_act_filtered.get('total_manhr', 0), errors='coerce').sum()
 
-st.markdown("<br><br>", unsafe_allow_html=True)
+# Filtro de colaboradores "Em aberto" (Ativos agora)
+if 'last_checkout' in df_act_filtered.columns:
+    ativos_mask = df_act_filtered['last_checkout'].astype(str).str.strip().str.upper() == 'EM ABERTO'
+    df_ativos = df_act_filtered[ativos_mask]
+else:
+    df_ativos = pd.DataFrame()
 
+# Remove duplicatas caso o mesmo operador apareça logado duas vezes
+if not df_ativos.empty and 'operator_id' in df_ativos.columns:
+    df_ativos = df_ativos.drop_duplicates(subset=['operator_id'])
+
+# Contagem por Workstation (Alocação)
+direto, indireto, improdutivo, pstl = 0, 0, 0, 0
+
+if 'workstation_name' in df_ativos.columns:
+    for ws in df_ativos['workstation_name'].dropna():
+        ws_str = str(ws).strip().upper()
+        
+        if ws_str.startswith('P1_') or ws_str.startswith('AU_'):
+            direto += 1
+        elif ws_str in ['SORT_GER', 'SORT_ASM']:
+            indireto += 1
+        elif ws_str in ['BREAK_MEAL', 'OUTHERS', 'FIVE_S', 'BREAK_MEAL ']:
+            improdutivo += 1
+        elif ws_str == 'PS_SHIPP':
+            pstl += 1
+
+# ==========================================
+# EXIBIÇÃO: CARDS KPI SUPERIORES
+# ==========================================
+st.markdown("<br>", unsafe_allow_html=True)
+col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+
+with col_kpi1:
+    st.metric("📦 THP TOTAL", f"{thp_total:,.0f}")
+with col_kpi2:
+    st.metric("🎯 META DO DIA", f"{meta_dia:,.0f}")
+with col_kpi3:
+    st.metric("⏱️ HORAS TRABALHADAS", f"{horas_trabalhadas:,.1f}h")
+with col_kpi4:
+    st.metric("⚠️ PENDENTE (PACKING)", f"{pendentes}")
+
+# ==========================================
+# EXIBIÇÃO: MINI-CARDS DE ALOCAÇÃO (PESSOINHAS)
+# ==========================================
+html_alloc = f"""
+<div class="alloc-container">
+    <div class="alloc-card">
+        DIRETO<br>
+        👥 <span class="alloc-number">{direto}</span>
+    </div>
+    <div class="alloc-card">
+        INDIRETO<br>
+        👥 <span class="alloc-number">{indireto}</span>
+    </div>
+    <div class="alloc-card">
+        IMPRODUTIVO<br>
+        👥 <span class="alloc-number">{improdutivo}</span>
+    </div>
+    <div class="alloc-card">
+        PS / TL<br>
+        👥 <span class="alloc-number">{pstl}</span>
+    </div>
+</div>
+"""
+st.markdown(html_alloc, unsafe_allow_html=True)
+
+
+# ==========================================
+# GRÁFICOS INFERIORES
+# ==========================================
 col_graf1, col_graf2 = st.columns(2)
 
 with col_graf1:
-    st.subheader("🔥 Top 5 Produtividade (Packing)")
+    st.markdown('<h3 style="color: #0d1b2a;">🔥 Top 5 Produtividade</h3>', unsafe_allow_html=True)
     if not df_prod_filtered.empty:
-        try:
-            df_prod_chart = df_prod_filtered.copy()
-            
-            # Garantir que a coluna name exista, se não usar operador
-            if 'name' not in df_prod_chart.columns:
-                df_prod_chart['name'] = df_prod_chart.get('operador', 'Desconhecido')
-            
-            # Limpeza rigorosa para evitar o ValueError do Plotly
-            df_prod_chart['total_packing'] = pd.to_numeric(df_prod_chart['total_packing'], errors='coerce')
-            df_prod_chart['name'] = df_prod_chart['name'].astype(str)
-            df_prod_chart = df_prod_chart.dropna(subset=['total_packing'])
-            df_prod_chart = df_prod_chart[df_prod_chart['total_packing'] > 0]
-            
-            if not df_prod_chart.empty:
-                top5 = df_prod_chart.nlargest(5, 'total_packing')
-                # text_auto preenche as barras sem dar conflito de dados
-                fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
-                             text_auto='.0f', color_discrete_sequence=['#EE4D2D'])
-                fig1.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="THP", yaxis_title="")
-                st.plotly_chart(fig1, use_container_width=True)
-            else:
-                st.info("Valores de total_packing são zero ou inválidos para esta data.")
-        except Exception as e:
-            st.error(f"Não foi possível gerar o gráfico Top 5. Erro nos dados: {e}")
+        # Copiando e limpando os dados com rigor para evitar Crash
+        df_chart = df_prod_filtered.copy()
+        df_chart['total_packing'] = pd.to_numeric(df_chart['total_packing'], errors='coerce')
+        df_chart = df_chart.dropna(subset=['total_packing'])
+        df_chart = df_chart[df_chart['total_packing'] > 0]
+        
+        if 'name' not in df_chart.columns:
+            df_chart['name'] = df_chart.get('operador', 'Desconhecido')
+        df_chart['name'] = df_chart['name'].astype(str)
+        
+        if not df_chart.empty:
+            top5 = df_chart.nlargest(5, 'total_packing')
+            fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
+                          text_auto='.0f', color_discrete_sequence=['#EE4D2D']) # Laranja Shopee
+            fig1.update_layout(
+                yaxis={'categoryorder':'total ascending'}, 
+                xaxis_title="", yaxis_title="",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            # Escurece as letras do eixo Y
+            fig1.update_yaxes(tickfont=dict(color="#0d1b2a", size=12))
+            st.plotly_chart(fig1, use_container_width=True)
+        else:
+            st.info("Valores zerados ou inválidos.")
     else:
         st.info("Sem dados para listar o ranking.")
 
 with col_graf2:
-    st.subheader("🎯 Atingimento da Meta")
+    st.markdown('<h3 style="color: #0d1b2a;">🎯 Atingimento da Meta</h3>', unsafe_allow_html=True)
     
     fig_gauge = go.Figure(go.Indicator(
         mode = "gauge+number+delta",
         value = thp_total,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Progresso THP", 'font': {'size': 24}},
-        delta = {'reference': meta_dia, 'increasing': {'color': "#008000"}, 'decreasing': {'color': "#FF0000"}},
+        delta = {'reference': meta_dia, 'increasing': {'color': "#0d1b2a"}, 'decreasing': {'color': "#EE4D2D"}},
         gauge = {
-            'axis': {'range': [None, max(thp_total, meta_dia) * 1.2], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "#EE4D2D"},
+            'axis': {'range': [None, max(thp_total, meta_dia) * 1.2], 'tickwidth': 1, 'tickcolor': "#0d1b2a"},
+            'bar': {'color': "#EE4D2D"}, # Laranja Shopee
             'bgcolor': "white",
             'borderwidth': 2,
-            'bordercolor': "gray",
+            'bordercolor': "#0d1b2a",
             'steps': [
-                {'range': [0, meta_dia * 0.5], 'color': '#ffcccb'},
-                {'range': [meta_dia * 0.5, meta_dia * 0.9], 'color': '#fffacd'},
-                {'range': [meta_dia * 0.9, meta_dia * 1.5], 'color': '#d4edda'}],
+                {'range': [0, meta_dia * 0.5], 'color': '#f8f9fa'},
+                {'range': [meta_dia * 0.5, meta_dia * 0.9], 'color': '#e9ecef'},
+                {'range': [meta_dia * 0.9, meta_dia * 1.5], 'color': '#dee2e6'}],
             'threshold': {
-                'line': {'color': "black", 'width': 4},
-                'thickness': 0.75,
+                'line': {'color': "#0d1b2a", 'width': 6}, # Azul Escuro
+                'thickness': 0.8,
                 'value': meta_dia}
         }
     ))
-    fig_gauge.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20))
+    fig_gauge.update_layout(
+        height=320, 
+        margin=dict(l=20, r=20, t=30, b=20),
+        font=dict(color="#0d1b2a")
+    )
     st.plotly_chart(fig_gauge, use_container_width=True)
+```eof
+
+Eu configurei a caixa preta do `[data-testid="stSidebar"]` para `#0d1b2a`, e os cards de alocação também carregam esse azul escuro premium com as bordas em laranja (`#EE4D2D`).
+
+Faça o teste e me conte se as caixinhas de alocação bateram com as pessoas que estão em operação agora no seu galpão!
