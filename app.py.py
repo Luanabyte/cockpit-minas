@@ -83,33 +83,42 @@ def load_mock_data():
     
     return df_act, df_pck, df_idl, df_sla, df_prod, df_dmo
 
-# ==========================================
-# CSS CUSTOMIZADO (AZUL ESCURO, LARANJA E CARDS)
-# ==========================================
 st.markdown("""
 <style>
-    /* Ocultar header padrão */
+    /* Ocultar header e ajustar margens */
     header {visibility: hidden;}
     .block-container {padding-top: 1rem; padding-bottom: 0rem; max-width: 98%;}
     
-    /* Barra Lateral Azul Escuro */
+    /* Fundo da tela principal (Azul Marinho Profundo) */
+    .stApp {
+        background-color: #15192B !important;
+    }
+    
+    /* Textos gerais para branco */
+    p, span, div {
+        color: #E2E8F0;
+    }
+    
+    /* Barra Lateral */
     [data-testid="stSidebar"] {
-        background-color: #0d1b2a !important;
+        background-color: #0E121E !important;
+        border-right: 1px solid #21263C;
     }
     [data-testid="stSidebar"] * {
-        color: #ffffff !important;
+        color: #E2E8F0 !important;
     }
     
     /* Títulos Principais */
     .shopee-title {
         text-align: center;
-        color: #0d1b2a;
+        color: #FFFFFF;
         font-family: 'Arial Black', sans-serif;
         font-size: 3.5rem;
         margin-top: -30px;
         margin-bottom: 0px;
         text-transform: uppercase;
         letter-spacing: 4px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     .cockpit-title {
         text-align: right; 
@@ -120,75 +129,82 @@ st.markdown("""
         margin-top: 10px;
     }
     
-    /* Customização dos Cards Superiores (st.metric) */
+    /* Customização dos Cards Superiores (KPIs) - ESTILO DASHBOARD MODERNO */
     div[data-testid="metric-container"] {
-        background-color: #ffffff;
-        border-left: 6px solid #EE4D2D;
-        border-radius: 8px;
-        padding: 15px 20px;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
+        background-color: #21263C !important;
+        border-radius: 12px;
+        padding: 20px 20px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.4);
+        border-top: 3px solid #EE4D2D; /* Filete laranja no topo */
     }
     div[data-testid="metric-container"] label {
-        font-size: 1.1rem !important;
-        color: #0d1b2a !important;
-        font-weight: 700;
+        font-size: 1.0rem !important;
+        color: #A0AEC0 !important; /* Cinza claro para subtítulos */
+        font-weight: 600;
         margin-bottom: 5px;
     }
     div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-        font-size: 3rem !important;
-        color: #0d1b2a !important;
+        font-size: 2.8rem !important;
+        color: #FFFFFF !important;
         font-weight: 900 !important;
     }
     
-    /* Mini-Cards de Alocação (Pessoinhas) */
+    /* Mini-Cards de Alocação (Pessoinhas) - NOVO ESTILO DARK */
     .alloc-container {
         display: flex;
         justify-content: space-between;
-        gap: 15px;
+        gap: 20px;
         margin-top: 15px;
         margin-bottom: 25px;
     }
     .alloc-card {
-        background-color: #0d1b2a;
-        color: #ffffff;
+        background-color: #21263C;
+        color: #A0AEC0;
         flex: 1;
         text-align: center;
-        padding: 10px;
-        border-radius: 6px;
+        padding: 15px 10px;
+        border-radius: 12px;
         font-weight: bold;
-        font-size: 1.2rem;
-        border-bottom: 4px solid #EE4D2D;
-        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+        font-size: 1.1rem;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.4);
+        border-left: 4px solid #EE4D2D; /* Filete lateral */
     }
     .alloc-number {
-        font-size: 1.5rem;
-        color: #EE4D2D;
+        font-size: 1.8rem;
+        color: #FFFFFF;
+        display: block;
+        margin-top: 5px;
+    }
+    
+    /* Títulos dos gráficos */
+    .chart-title {
+        color: #FFFFFF;
+        font-size: 1.3rem;
+        font-weight: bold;
+        margin-bottom: -10px;
+        padding-left: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# CARREGAMENTO DE DADOS
-# ==========================================
 if USAR_DADOS_REAIS:
     try:
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_real_data()
     except Exception as e:
-        st.sidebar.error(f"Erro de permissão: Compartilhe a planilha com o e-mail do Service Account. Detalhe: {e}")
+        st.sidebar.error(f"Erro de permissão: {e}")
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 else:
-    st.sidebar.warning("⚠ Usando dados simulados. Preencha as senhas na nuvem.")
+    st.sidebar.warning("⚠️ Usando dados simulados.")
     df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 
-st.sidebar.title("Opções")
+st.sidebar.title("Filtros")
 
 df_prod['data'] = df_prod['data'].fillna('Sem Data').astype(str)
 datas_disponiveis = sorted([d for d in df_prod['data'].unique() if d != 'Sem Data' and d.strip() != ''], reverse=True)
 
 if len(datas_disponiveis) > 0:
-    data_selecionada = st.sidebar.selectbox("Selecione a Data:", datas_disponiveis)
+    data_selecionada = st.sidebar.selectbox("Data Operacional:", datas_disponiveis)
 else:
-    st.sidebar.warning("Nenhuma data encontrada na aba prod.")
     data_selecionada = "Nenhuma"
 
 # ==========================================
@@ -200,171 +216,124 @@ with col_topo2:
 with col_topo3:
     st.markdown('<div class="cockpit-title">COCKPIT</div>', unsafe_allow_html=True)
 
-
-# ==========================================
-# CÁLCULOS DAS MÉTRICAS GERAIS
-# ==========================================
 df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
 thp_total = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce').sum()
 
-# Meta DMO (Somando D16:D25)
+# Meta DMO
 try:
-    if not df_dmo.empty and len(df_dmo.columns) >= 4:
-        # Coluna D é o índice 3. Linhas 16 a 25 no Excel são índices 15 a 24 no Python
-        coluna_meta = df_dmo.columns[3]
-        valores_meta = pd.to_numeric(df_dmo[coluna_meta].iloc[15:25], errors='coerce')
+    if not df_dmo.empty:
+        col_d = df_dmo.columns[3]
+        valores_meta = pd.to_numeric(df_dmo[col_d].iloc[15:25], errors='coerce')
         meta_dia = valores_meta.sum()
-        if pd.isna(meta_dia) or meta_dia == 0:
-            meta_dia = 20000 
-    else:
-        meta_dia = 20000 
-except:
-    meta_dia = 20000
+        if pd.isna(meta_dia) or meta_dia == 0: meta_dia = 20000 
+    else: meta_dia = 20000 
+except: meta_dia = 20000
 
 # Pendentes Packing
 pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
 
-# ==========================================
-# CÁLCULOS DE ALOCAÇÃO E HORAS (Aba raw_activity)
-# ==========================================
+# Alocação
 df_activity['data'] = df_activity['data'].astype(str)
 df_act_filtered = df_activity[df_activity['data'] == data_selecionada].copy()
-
-# Total de Horas Trabalhadas no dia (Soma da Coluna J = total_manhr)
 horas_trabalhadas = pd.to_numeric(df_act_filtered.get('total_manhr', 0), errors='coerce').sum()
 
-# Filtro de colaboradores "Em aberto" (Ativos agora)
 if 'last_checkout' in df_act_filtered.columns:
     ativos_mask = df_act_filtered['last_checkout'].astype(str).str.strip().str.upper() == 'EM ABERTO'
     df_ativos = df_act_filtered[ativos_mask]
-else:
-    df_ativos = pd.DataFrame()
+else: df_ativos = pd.DataFrame()
 
-# Remove duplicatas caso o mesmo operador apareça logado duas vezes
 if not df_ativos.empty and 'operator_id' in df_ativos.columns:
     df_ativos = df_ativos.drop_duplicates(subset=['operator_id'])
 
-# Contagem por Workstation (Alocação)
 direto, indireto, improdutivo, pstl = 0, 0, 0, 0
-
 if 'workstation_name' in df_ativos.columns:
     for ws in df_ativos['workstation_name'].dropna():
         ws_str = str(ws).strip().upper()
-        
-        if ws_str.startswith('P1_') or ws_str.startswith('AU_'):
-            direto += 1
-        elif ws_str in ['SORT_GER', 'SORT_ASM']:
-            indireto += 1
-        elif ws_str in ['BREAK_MEAL', 'OUTHERS', 'FIVE_S', 'BREAK_MEAL ']:
-            improdutivo += 1
-        elif ws_str == 'PS_SHIPP':
-            pstl += 1
+        if ws_str.startswith('P1_') or ws_str.startswith('AU_'): direto += 1
+        elif ws_str in ['SORT_GER', 'SORT_ASM']: indireto += 1
+        elif ws_str in ['BREAK_MEAL', 'OUTHERS', 'FIVE_S', 'BREAK_MEAL ']: improdutivo += 1
+        elif ws_str == 'PS_SHIPP': pstl += 1
 
-# ==========================================
-# EXIBIÇÃO: CARDS KPI SUPERIORES
-# ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
 
-with col_kpi1:
-    st.metric("⛟ THP TOTAL", f"{thp_total:,.0f}")
-with col_kpi2:
-    st.metric("⌖ META DO DIA", f"{meta_dia:,.0f}")
-with col_kpi3:
-    st.metric("◷ HORAS TRABALHADAS", f"{horas_trabalhadas:,.1f}h")
-with col_kpi4:
-    st.metric("⚠ PENDENTE (PACKING)", f"{pendentes}")
+with col_kpi1: st.metric("⛟ THP TOTAL", f"{thp_total:,.0f}")
+with col_kpi2: st.metric("⌖ META DO DIA", f"{meta_dia:,.0f}")
+with col_kpi3: st.metric("◷ HORAS TRABALHADAS", f"{horas_trabalhadas:,.1f}h")
+with col_kpi4: st.metric("⚠ PENDENTES (PACKING)", f"{pendentes}")
 
-# ==========================================
-# EXIBIÇÃO: MINI-CARDS DE ALOCAÇÃO (PESSOINHAS)
-# ==========================================
 html_alloc = f"""
 <div class="alloc-container">
-    <div class="alloc-card">
-        DIRETO<br>
-        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{direto}</span>
-    </div>
-    <div class="alloc-card">
-        INDIRETO<br>
-        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{indireto}</span>
-    </div>
-    <div class="alloc-card">
-        IMPRODUTIVO<br>
-        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{improdutivo}</span>
-    </div>
-    <div class="alloc-card">
-        PS / TL<br>
-        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{pstl}</span>
-    </div>
+    <div class="alloc-card">DIRETO<span class="alloc-number">⚑ {direto}</span></div>
+    <div class="alloc-card">INDIRETO<span class="alloc-number">⚑ {indireto}</span></div>
+    <div class="alloc-card">IMPRODUTIVO<span class="alloc-number">⚑ {improdutivo}</span></div>
+    <div class="alloc-card">PS / TL<span class="alloc-number">⚑ {pstl}</span></div>
 </div>
 """
 st.markdown(html_alloc, unsafe_allow_html=True)
 
-
-# ==========================================
-# GRÁFICOS INFERIORES
-# ==========================================
 col_graf1, col_graf2 = st.columns(2)
 
 with col_graf1:
-    st.markdown('<h3 style="color: #0d1b2a;">▤ Top 5 Produtividade</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">▤ Top 5 Produtividade (Packing)</div>', unsafe_allow_html=True)
     if not df_prod_filtered.empty:
-        # Copiando e limpando os dados com rigor para evitar Crash
         df_chart = df_prod_filtered.copy()
         df_chart['total_packing'] = pd.to_numeric(df_chart['total_packing'], errors='coerce')
         df_chart = df_chart.dropna(subset=['total_packing'])
         df_chart = df_chart[df_chart['total_packing'] > 0]
-        
-        if 'name' not in df_chart.columns:
-            df_chart['name'] = df_chart.get('operador', 'Desconhecido')
-        df_chart['name'] = df_chart['name'].astype(str)
+        df_chart['name'] = df_chart.get('name', df_chart.get('operador', 'Desconhecido')).astype(str)
         
         if not df_chart.empty:
             top5 = df_chart.nlargest(5, 'total_packing')
+            # Gráfico de Barras Dark Mode
             fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
-                          text_auto='.0f', color_discrete_sequence=['#EE4D2D']) # Laranja Shopee
+                          text_auto='.0f', color_discrete_sequence=['#EE4D2D'], template='plotly_dark')
+            
+            # Simulando um "Cartão" por trás do gráfico
             fig1.update_layout(
-                yaxis={'categoryorder':'total ascending'}, 
-                xaxis_title="", yaxis_title="",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0, r=0, t=10, b=0)
+                yaxis={'categoryorder':'total ascending', 'showgrid': False, 'title': ''}, 
+                xaxis={'showgrid': False, 'title': '', 'visible': False},
+                plot_bgcolor="#21263C", # Fundo do Cartão
+                paper_bgcolor="#21263C", # Fundo ao redor do Cartão
+                margin=dict(l=20, r=20, t=30, b=20),
+                font=dict(color="#A0AEC0"),
+                height=320
             )
-            # Escurece as letras do eixo Y
-            fig1.update_yaxes(tickfont=dict(color="#0d1b2a", size=12))
+            # Bordas arredondadas e margin usando CSS no container via st.plotly_chart não é direto, 
+            # mas o fundo #21263C já dá a ilusão perfeita do card sobre o fundo #15192B.
             st.plotly_chart(fig1, use_container_width=True)
-        else:
-            st.info("Valores zerados ou inválidos.")
-    else:
-        st.info("Sem dados para listar o ranking.")
+        else: st.info("Valores zerados.")
 
 with col_graf2:
-    st.markdown('<h3 style="color: #0d1b2a;">⌖ Atingimento da Meta</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">⌖ Atingimento da Meta</div>', unsafe_allow_html=True)
     
+    # Velocímetro Dark Mode
     fig_gauge = go.Figure(go.Indicator(
         mode = "gauge+number+delta",
         value = thp_total,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        delta = {'reference': meta_dia, 'increasing': {'color': "#0d1b2a"}, 'decreasing': {'color': "#EE4D2D"}},
+        delta = {'reference': meta_dia, 'increasing': {'color': "#38A169"}, 'decreasing': {'color': "#E53E3E"}},
         gauge = {
-            'axis': {'range': [None, max(thp_total, meta_dia) * 1.2], 'tickwidth': 1, 'tickcolor': "#0d1b2a"},
-            'bar': {'color': "#EE4D2D"}, # Laranja Shopee
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "#0d1b2a",
+            'axis': {'range': [None, max(thp_total, meta_dia) * 1.2], 'tickwidth': 1, 'tickcolor': "#A0AEC0", 'tickfont': {'color': "#A0AEC0"}},
+            'bar': {'color': "#EE4D2D"}, 
+            'bgcolor': "#21263C", # Fundo escuro do gauge
+            'borderwidth': 0,
             'steps': [
-                {'range': [0, meta_dia * 0.5], 'color': '#f8f9fa'},
-                {'range': [meta_dia * 0.5, meta_dia * 0.9], 'color': '#e9ecef'},
-                {'range': [meta_dia * 0.9, meta_dia * 1.5], 'color': '#dee2e6'}],
+                {'range': [0, meta_dia * 0.5], 'color': '#1A1E2F'},
+                {'range': [meta_dia * 0.5, meta_dia * 0.9], 'color': '#2A3047'},
+                {'range': [meta_dia * 0.9, meta_dia * 1.5], 'color': '#333A56'}],
             'threshold': {
-                'line': {'color': "#0d1b2a", 'width': 6}, # Azul Escuro
-                'thickness': 0.8,
+                'line': {'color': "#FFFFFF", 'width': 4}, 
+                'thickness': 0.75,
                 'value': meta_dia}
         }
     ))
     fig_gauge.update_layout(
+        template='plotly_dark',
+        plot_bgcolor="#21263C",
+        paper_bgcolor="#21263C",
         height=320, 
-        margin=dict(l=20, r=20, t=30, b=20),
-        font=dict(color="#0d1b2a")
+        margin=dict(l=20, r=20, t=40, b=20),
+        font=dict(color="#FFFFFF")
     )
     st.plotly_chart(fig_gauge, use_container_width=True)
