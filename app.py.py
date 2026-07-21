@@ -177,7 +177,7 @@ if USAR_DADOS_REAIS:
         st.sidebar.error(f"Erro de permissão: Compartilhe a planilha com o e-mail do Service Account. Detalhe: {e}")
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 else:
-    st.sidebar.warning("⚠️ Usando dados simulados. Preencha as senhas na nuvem.")
+    st.sidebar.warning("⚠ Usando dados simulados. Preencha as senhas na nuvem.")
     df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 
 st.sidebar.title("Opções")
@@ -200,22 +200,26 @@ with col_topo2:
 with col_topo3:
     st.markdown('<div class="cockpit-title">COCKPIT</div>', unsafe_allow_html=True)
 
+
 # ==========================================
 # CÁLCULOS DAS MÉTRICAS GERAIS
 # ==========================================
 df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
 thp_total = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce').sum()
 
-# Meta DMO
+# Meta DMO (Somando D16:D25)
 try:
-    if not df_dmo.empty and len(df_dmo) >= 25:
-        coluna_meta = df_dmo.columns[3] if len(df_dmo.columns) > 3 else df_dmo.columns[-1]
-        meta_dia = pd.to_numeric(df_dmo[coluna_meta].iloc[15:25], errors='coerce').sum()
+    if not df_dmo.empty and len(df_dmo.columns) >= 4:
+        # Coluna D é o índice 3. Linhas 16 a 25 no Excel são índices 15 a 24 no Python
+        coluna_meta = df_dmo.columns[3]
+        valores_meta = pd.to_numeric(df_dmo[coluna_meta].iloc[15:25], errors='coerce')
+        meta_dia = valores_meta.sum()
+        if pd.isna(meta_dia) or meta_dia == 0:
+            meta_dia = 20000 
     else:
         meta_dia = 20000 
 except:
     meta_dia = 20000
-if pd.isna(meta_dia) or meta_dia == 0: meta_dia = 20000
 
 # Pendentes Packing
 pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
@@ -263,13 +267,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
 
 with col_kpi1:
-    st.metric("📦 THP TOTAL", f"{thp_total:,.0f}")
+    st.metric("⛟ THP TOTAL", f"{thp_total:,.0f}")
 with col_kpi2:
-    st.metric("🎯 META DO DIA", f"{meta_dia:,.0f}")
+    st.metric("⌖ META DO DIA", f"{meta_dia:,.0f}")
 with col_kpi3:
-    st.metric("⏱️ HORAS TRABALHADAS", f"{horas_trabalhadas:,.1f}h")
+    st.metric("◷ HORAS TRABALHADAS", f"{horas_trabalhadas:,.1f}h")
 with col_kpi4:
-    st.metric("⚠️ PENDENTE (PACKING)", f"{pendentes}")
+    st.metric("⚠ PENDENTE (PACKING)", f"{pendentes}")
 
 # ==========================================
 # EXIBIÇÃO: MINI-CARDS DE ALOCAÇÃO (PESSOINHAS)
@@ -278,23 +282,24 @@ html_alloc = f"""
 <div class="alloc-container">
     <div class="alloc-card">
         DIRETO<br>
-        👥 <span class="alloc-number">{direto}</span>
+        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{direto}</span>
     </div>
     <div class="alloc-card">
         INDIRETO<br>
-        👥 <span class="alloc-number">{indireto}</span>
+        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{indireto}</span>
     </div>
     <div class="alloc-card">
         IMPRODUTIVO<br>
-        👥 <span class="alloc-number">{improdutivo}</span>
+        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{improdutivo}</span>
     </div>
     <div class="alloc-card">
         PS / TL<br>
-        👥 <span class="alloc-number">{pstl}</span>
+        <span style="font-size: 1.2rem; margin-right: 5px;">👤</span> <span class="alloc-number">{pstl}</span>
     </div>
 </div>
 """
 st.markdown(html_alloc, unsafe_allow_html=True)
+
 
 # ==========================================
 # GRÁFICOS INFERIORES
@@ -302,7 +307,7 @@ st.markdown(html_alloc, unsafe_allow_html=True)
 col_graf1, col_graf2 = st.columns(2)
 
 with col_graf1:
-    st.markdown('<h3 style="color: #0d1b2a;">🔥 Top 5 Produtividade</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #0d1b2a;">▤ Top 5 Produtividade</h3>', unsafe_allow_html=True)
     if not df_prod_filtered.empty:
         # Copiando e limpando os dados com rigor para evitar Crash
         df_chart = df_prod_filtered.copy()
@@ -334,7 +339,7 @@ with col_graf1:
         st.info("Sem dados para listar o ranking.")
 
 with col_graf2:
-    st.markdown('<h3 style="color: #0d1b2a;">🎯 Atingimento da Meta</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color: #0d1b2a;">⌖ Atingimento da Meta</h3>', unsafe_allow_html=True)
     
     fig_gauge = go.Figure(go.Indicator(
         mode = "gauge+number+delta",
