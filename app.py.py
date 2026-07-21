@@ -11,10 +11,10 @@ except ImportError:
     HAS_GSHEETS = False
 
 st.set_page_config(
-    page_title="Dashboard Operacional | Shipping",
+    page_title="Shipping Central | Operações",
     page_icon="📦",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Esconde a barra lateral automaticamente
 )
 
 def check_secrets():
@@ -27,156 +27,174 @@ def check_secrets():
 
 USAR_DADOS_REAIS = check_secrets() and HAS_GSHEETS
 
-# Reduzi o tempo de cache (ttl) para 1 minuto enquanto estamos testando
 @st.cache_data(ttl=60) 
 def load_real_data():
     conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # AJUSTE: Nomes exatos das abas respeitando maiúsculas/minúsculas
-    df_act = conn.read(worksheet="raw_activity", usecols=list(range(17)))
-    df_pck = conn.read(worksheet="packed", usecols=list(range(5)))
-    df_idl = conn.read(worksheet="raw_IDLE", usecols=list(range(10))) # Corrigido para IDLE maiúsculo
-    df_sla = conn.read(worksheet="SLA_COT", usecols=list(range(7)))
+    df_act = conn.read(worksheet="raw_activity", usecols=list(range(17)), ttl="1m")
+    df_pck = conn.read(worksheet="packed", usecols=list(range(5)), ttl="1m")
+    df_idl = conn.read(worksheet="raw_IDLE", usecols=list(range(10)), ttl="1m") 
+    df_sla = conn.read(worksheet="SLA_COT", usecols=list(range(7)), ttl="1m")
     
-    return df_act, df_pck, df_idl, df_sla
+    # Lendo a nova aba (Tentando 'prod' ou 'productivy' baseado nos seus prints)
+    try:
+        df_prod = conn.read(worksheet="prod", usecols=list(range(6)), ttl="1m")
+    except Exception:
+        try:
+            df_prod = conn.read(worksheet="productivy", usecols=list(range(6)), ttl="1m")
+        except:
+            df_prod = pd.DataFrame(columns=['data', 'operador', 'total_packing', 'total_stage_out', 'total_geral', 'name'])
+            
+    return df_act, df_pck, df_idl, df_sla, df_prod
 
 @st.cache_data
 def load_mock_data():
-    dates_act = pd.date_range(end=datetime.now(), periods=5).strftime('%Y-%m-%d').tolist() * 4
-    df_act = pd.DataFrame({'data': dates_act, 'operator_id': [f'ops{np.random.randint(100000, 999999)}' for _ in range(20)], 'operator_email': [f'user{i}@email.com' for i in range(20)], 'station_name': ['FBS_MG_Contagem_1'] * 20, 'workstation_name': np.random.choice(['INDIRETOS', 'P1_AU01', 'P1_AU09', 'PS_SHIPP'], 20), 'total_manhr': np.random.uniform(1.0, 8.5, 20).round(1), 'total_shipments': np.random.randint(0, 1500, 20), 'total_received': np.random.randint(0, 10, 20), 'total_packing': np.random.randint(0, 1500, 20), 'operator_name': [f'Operador Simulado {i}' for i in range(20)]})
-    dates_pck = pd.date_range(end=datetime.now(), periods=10).strftime('%Y-%m-%d').tolist() * 5
-    df_pck = pd.DataFrame({'data': sorted(dates_pck, reverse=True), 'galpao': ['FBS_MG_Contagem_1'] * 50, 'size_type': np.random.choice(['Bulky', 'G', 'M', 'P', 'PP', 'Ultra Bulky'], 50), 'thp': np.random.randint(5, 15000, 50)})
-    df_idl = pd.DataFrame({'data': ['2026-07-18'] * 20, 'ops_id': [f'Ops{np.random.randint(100000, 999999)}' for _ in range(20)], 'idle_horas_decimal': np.random.uniform(0.05, 6.0, 20).round(2), 'ops_name': [f'Operador Simulado {i}' for i in range(20)]})
-    df_sla = pd.DataFrame({'shipment_id': [f'BR{np.random.randint(1000000000, 9999999999)}' for _ in range(50)], 'last_status': np.random.choice(['SOC_Packing', 'SOC_Packed', 'SOC_LHPacking'], 50, p=[0.4, 0.5, 0.1]), 'created_time_last': pd.date_range(end=datetime.now(), periods=50).strftime('%Y-%m-%d %H:%M:%S')})
-    return df_act, df_pck, df_idl, df_sla
+    # Gerando dados falsos caso a internet caia ou a permissão falhe
+    dates = ['2026-07-21'] * 20
+    df_act = pd.DataFrame({'data': dates, 'total_manhr': [8]*20, 'total_shipments': [100]*20})
+    df_pck = pd.DataFrame({'data': dates, 'size_type': ['M']*20, 'thp': [100]*20})
+    df_idl = pd.DataFrame({'data': dates, 'idle_horas_decimal': [1]*20})
+    df_sla = pd.DataFrame({'last_status': ['SOC_Packing']*16 + ['SOC_Packed']*4})
+    
+    # Mock da aba PROD
+    df_prod = pd.DataFrame({
+        'data': dates,
+        'operador': [f'user{i}@email.com' for i in range(20)],
+        'total_packing': np.random.randint(100, 2000, 20),
+        'total_stage_out': np.random.randint(0, 500, 20),
+        'total_geral': np.random.randint(100, 2500, 20),
+        'name': [f'Operador Shopee {i}' for i in range(20)]
+    })
+    return df_act, df_pck, df_idl, df_sla, df_prod
 
+st.markdown("""
+<style>
+    /* Esconde barra padrão do Streamlit para parecer um sistema nativo */
+    header {visibility: hidden;}
+    .block-container {padding-top: 1rem; padding-bottom: 0rem; max-width: 95%;}
+    
+    /* Título SHIPPING no Topo */
+    .shopee-title {
+        text-align: center;
+        color: #EE4D2D;
+        font-family: 'Arial Black', sans-serif;
+        font-size: 5rem;
+        margin-top: -60px;
+        margin-bottom: -10px;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Customização Extrema dos Cards de Métricas */
+    div[data-testid="metric-container"] {
+        background-color: #ffffff;
+        border: 1px solid #f0f0f0;
+        border-top: 10px solid #EE4D2D;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0px 8px 16px rgba(0,0,0,0.08);
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    div[data-testid="metric-container"]:hover {
+        transform: scale(1.03);
+        box-shadow: 0px 12px 20px rgba(238,77,45,0.2);
+    }
+    
+    /* Título do Card (Ex: THP TOTAL) */
+    div[data-testid="metric-container"] label {
+        font-size: 1.5rem !important;
+        color: #777 !important;
+        font-weight: bold;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+    
+    /* Valor numérico gigante no Card */
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+        font-size: 5.5rem !important;
+        color: #EE4D2D !important;
+        font-weight: 900 !important;
+        justify-content: center;
+        line-height: 1.1;
+    }
+    
+    /* Centralizar a caixa de Data no meio da tela */
+    .stSelectbox > div {
+        max-width: 300px;
+        margin: 0 auto;
+        border: 2px solid #EE4D2D;
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.sidebar.image("https://placehold.co/400x150/1e1e1e/FFF?text=Logistics+Hub", use_column_width=True)
-st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Navegação e Filtros")
-
-# Lógica de conexão com aviso de erro melhorado
 if USAR_DADOS_REAIS:
     try:
-        df_activity, df_packed, df_idle, df_sla = load_real_data()
-        st.sidebar.success("✅ Conectado ao Google Sheets Oficial!")
+        df_activity, df_packed, df_idle, df_sla, df_prod = load_real_data()
     except Exception as e:
-        st.sidebar.error("❌ Falha na conexão com a planilha real.")
-        st.error(f"DETALHE DO ERRO (Mande isso para correção):\n{e}")
-        df_activity, df_packed, df_idle, df_sla = load_mock_data()
+        st.error("Falha na conexão com a planilha real. Mostrando dados simulados.")
+        df_activity, df_packed, df_idle, df_sla, df_prod = load_mock_data()
 else:
-    st.sidebar.warning("⚠️ Usando dados simulados. Você não preencheu as senhas (Secrets) na nuvem.")
-    if not HAS_GSHEETS:
-        st.sidebar.error("Falta instalar a biblioteca: rode `pip install st-gsheets-connection`.")
-    df_activity, df_packed, df_idle, df_sla = load_mock_data()
+    df_activity, df_packed, df_idle, df_sla, df_prod = load_mock_data()
 
+# Renderização do Título Master
+st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
 
-menu_options = ["🏠 Visão Geral", "📊 Produtividade", "📦 Perfil de Carga (Packed)", "⏳ SLA e Ociosidade"]
-choice = st.sidebar.radio("Ir para:", menu_options)
+# Tratamento da Data (pegando da aba prod)
+df_prod['data'] = df_prod['data'].fillna('Sem Data').astype(str)
+datas_disponiveis = sorted([d for d in df_prod['data'].unique() if d != 'Sem Data' and d.strip() != ''], reverse=True)
 
-st.sidebar.markdown("---")
+col_vazia1, col_filtro, col_vazia2 = st.columns([1, 1, 1])
+with col_filtro:
+    if len(datas_disponiveis) > 0:
+        data_selecionada = st.selectbox("Selecione a Data:", datas_disponiveis, label_visibility="collapsed")
+    else:
+        st.warning("Nenhuma data encontrada na aba prod.")
+        data_selecionada = "Nenhuma"
 
-df_activity['data'] = df_activity['data'].fillna('Sem Data').astype(str)
-df_packed['data'] = df_packed['data'].fillna('Sem Data').astype(str)
+st.markdown("<br><br>", unsafe_allow_html=True)
 
-datas_disponiveis = sorted([d for d in df_activity['data'].unique() if d != 'Sem Data'], reverse=True)
-if len(datas_disponiveis) > 0:
-    data_selecionada = st.sidebar.selectbox("Selecione a Data de Referência:", datas_disponiveis)
-    df_activity_filtered = df_activity[df_activity['data'] == data_selecionada]
-    df_packed_filtered = df_packed[df_packed['data'] == data_selecionada]
-else:
-    data_selecionada = "Nenhuma data"
-    df_activity_filtered = df_activity
-    df_packed_filtered = df_packed
+df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
 
-if choice == "🏠 Visão Geral":
-    st.title("🏠 Dashboard Master Operacional")
-    st.markdown(f"**Data de Referência:** {data_selecionada}")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        total_shipments = pd.to_numeric(df_activity_filtered['total_shipments'], errors='coerce').sum()
-        st.metric(label="Total Shipments (Dia)", value=f"{total_shipments:,.0f}")
-    with col2:
-        total_horas = pd.to_numeric(df_activity_filtered['total_manhr'], errors='coerce').sum()
-        st.metric(label="Total Horas Trabalhadas", value=f"{total_horas:.1f}h")
-    with col3:
-        pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
-        st.metric(label="Pendentes (SOC_Packing)", value=pendentes)
-    with col4:
-        ociosidade_media = pd.to_numeric(df_idle['idle_horas_decimal'], errors='coerce').mean()
-        st.metric(label="Ociosidade Média (h)", value=f"{ociosidade_media:.2f}h")
-        
-    st.markdown("---")
-    
-    col_chart1, col_chart2 = st.columns(2)
-    with col_chart1:
-        st.subheader("Distribuição de Status (SLA)")
-        status_counts = df_sla['last_status'].value_counts().reset_index()
-        status_counts.columns = ['Status', 'Quantidade']
-        fig_status = px.pie(status_counts, values='Quantidade', names='Status', 
-                            hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
-        st.plotly_chart(fig_status, use_container_width=True)
-        
-    with col_chart2:
-        st.subheader("Volume por Tamanho (Packed)")
-        if not df_packed_filtered.empty:
-            df_packed_filtered['thp'] = pd.to_numeric(df_packed_filtered['thp'], errors='coerce')
-            size_counts = df_packed_filtered.groupby('size_type')['thp'].sum().reset_index()
-            fig_sizes = px.bar(size_counts, x='size_type', y='thp', 
-                               color='size_type', text='thp')
-            st.plotly_chart(fig_sizes, use_container_width=True)
+# SOMA DO THP: Pegando a coluna 'total_packing' da sua aba 'prod'
+thp_total = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce').sum()
 
-elif choice == "📊 Produtividade":
-    st.title("📊 Análise de Produtividade (Activity)")
-    st.markdown("### Top 10 Operadores por Volume")
-    
-    df_activity_filtered['total_shipments'] = pd.to_numeric(df_activity_filtered['total_shipments'], errors='coerce')
-    df_activity_filtered['total_manhr'] = pd.to_numeric(df_activity_filtered['total_manhr'], errors='coerce')
-    
-    df_ops = df_activity_filtered.groupby('operator_name').agg({'total_shipments': 'sum', 'total_manhr': 'sum'}).reset_index()
-    df_ops['produtividade_h'] = (df_ops['total_shipments'] / df_ops['total_manhr']).fillna(0)
-    df_top10 = df_ops.sort_values(by='total_shipments', ascending=False).head(10)
-    
-    fig_top10 = px.bar(df_top10, x='total_shipments', y='operator_name', orientation='h',
-                       color='produtividade_h', color_continuous_scale='Viridis',
-                       title="Volume Total vs Produtividade por Hora")
-    fig_top10.update_layout(yaxis={'categoryorder':'total ascending'})
-    st.plotly_chart(fig_top10, use_container_width=True)
-    
-    st.markdown("### Base Bruta da Data Selecionada")
-    st.dataframe(df_activity_filtered, use_container_width=True)
+# Outras métricas
+pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
+headcount = df_prod_filtered['operador'].nunique() if not df_prod_filtered.empty else 0
 
-elif choice == "📦 Perfil de Carga (Packed)":
-    st.title("📦 Análise do Perfil de Carga")
-    df_packed['thp'] = pd.to_numeric(df_packed['thp'], errors='coerce')
-    df_packed_trend = df_packed.groupby(['data', 'size_type'])['thp'].sum().reset_index()
-    fig_trend = px.area(df_packed_trend, x='data', y='thp', color='size_type')
-    st.plotly_chart(fig_trend, use_container_width=True)
-    st.dataframe(df_packed_filtered, use_container_width=True)
+col_met1, col_met_principal, col_met3 = st.columns([1, 1.8, 1])
 
-elif choice == "⏳ SLA e Ociosidade":
-    st.title("⏳ Controle de Qualidade e Perdas")
-    
-    col_idle, col_sla = st.columns([1, 1])
-    with col_idle:
-        st.subheader("⚠️ Top Ociosidade (Raw Idle)")
-        df_idle['idle_horas_decimal'] = pd.to_numeric(df_idle['idle_horas_decimal'], errors='coerce')
-        df_idle_sorted = df_idle.sort_values(by='idle_horas_decimal', ascending=False).head(10)
-        fig_idle = px.bar(df_idle_sorted, x='idle_horas_decimal', y='ops_name', orientation='h',
-                          color='idle_horas_decimal', color_continuous_scale='Reds')
-        fig_idle.update_layout(yaxis={'categoryorder':'total ascending'})
-        st.plotly_chart(fig_idle, use_container_width=True)
-        
-    with col_sla:
-        st.subheader("📋 Últimos Status (SLA COT)")
-        search_shipment = st.text_input("🔍 Buscar Shipment ID (ex: BR...):")
-        if search_shipment:
-            df_sla['shipment_id'] = df_sla['shipment_id'].astype(str)
-            result = df_sla[df_sla['shipment_id'].str.contains(search_shipment, case=False, na=False)]
-            st.dataframe(result, use_container_width=True)
-        else:
-            st.dataframe(df_sla.head(15), use_container_width=True)
+with col_met1:
+    st.metric("Operadores (HC)", f"{headcount}")
+with col_met_principal:
+    # Este é o card gigante no centro da tela
+    st.metric("THP TOTAL", f"{thp_total:,.0f}")
+with col_met3:
+    st.metric("Pendente (Packing)", f"{pendentes}")
 
-st.sidebar.markdown("---")
-st.sidebar.caption("Desenvolvido com ❤️ no Streamlit")
+st.markdown("<br><br>", unsafe_allow_html=True)
+
+col_graf1, col_graf2 = st.columns(2)
+
+with col_graf1:
+    st.subheader("🔥 Top 5 Produtividade (Packing)")
+    if not df_prod_filtered.empty:
+        df_prod_filtered['total_packing'] = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce')
+        top5 = df_prod_filtered.nlargest(5, 'total_packing')
+        fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
+                     text='total_packing', color_discrete_sequence=['#EE4D2D'])
+        fig1.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="THP", yaxis_title="")
+        st.plotly_chart(fig1, use_container_width=True)
+    else:
+        st.info("Sem dados para listar o ranking.")
+
+with col_graf2:
+    st.subheader("📋 Gargalo Atual (SLA)")
+    status_counts = df_sla['last_status'].value_counts().reset_index()
+    status_counts.columns = ['Status', 'Quantidade']
+    fig2 = px.pie(status_counts, values='Quantidade', names='Status', hole=0.6,
+                  color_discrete_sequence=['#EE4D2D', '#FF8C00', '#FFDAB9'])
+    st.plotly_chart(fig2, use_container_width=True)
