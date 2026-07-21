@@ -69,7 +69,6 @@ def load_mock_data():
         'name': [f'Operador Shopee {i}' for i in range(20)]
     })
     
-    # Mock for DMO tab to calculate target
     df_dmo = pd.DataFrame({
         'A': [''] * 30,
         'B': [''] * 30,
@@ -81,16 +80,14 @@ def load_mock_data():
 
 st.markdown("""
 <style>
-    /* Esconde barra padrão do Streamlit para parecer um sistema nativo */
+    /* Esconde barra padrão do Streamlit */
     header {visibility: hidden;}
-    .block-container {padding-top: 1rem; padding-bottom: 0rem; max-width: 95%;}
+    .block-container {padding-top: 1rem; padding-bottom: 0rem; max-width: 98%;}
     
     /* Personalização da Barra Lateral - AZUL ESCURO */
     [data-testid="stSidebar"] {
-        background-color: #0d1b2a !important; /* Azul escuro profundo */
+        background-color: #0d1b2a !important;
     }
-    
-    /* Cor do texto na barra lateral para contraste */
     [data-testid="stSidebar"] * {
         color: #ffffff !important;
     }
@@ -100,9 +97,9 @@ st.markdown("""
         text-align: center;
         color: #EE4D2D;
         font-family: 'Arial Black', sans-serif;
-        font-size: 5rem;
-        margin-top: -60px;
-        margin-bottom: -10px;
+        font-size: 4.5rem;
+        margin-top: -30px;
+        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 4px;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
@@ -112,42 +109,29 @@ st.markdown("""
     div[data-testid="metric-container"] {
         background-color: #ffffff;
         border: 1px solid #f0f0f0;
-        border-top: 10px solid #EE4D2D;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0px 8px 16px rgba(0,0,0,0.08);
+        border-top: 8px solid #EE4D2D;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
         text-align: center;
-        transition: transform 0.3s ease;
-    }
-    div[data-testid="metric-container"]:hover {
-        transform: scale(1.03);
-        box-shadow: 0px 12px 20px rgba(238,77,45,0.2);
     }
     
     /* Título do Card */
     div[data-testid="metric-container"] label {
-        font-size: 1.5rem !important;
+        font-size: 1.2rem !important;
         color: #777 !important;
         font-weight: bold;
         justify-content: center;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     
     /* Valor numérico no Card */
     div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-        font-size: 5.5rem !important;
+        font-size: 4.5rem !important;
         color: #EE4D2D !important;
         font-weight: 900 !important;
         justify-content: center;
         line-height: 1.1;
-    }
-    
-    /* Centralizar a caixa de Data no meio da tela */
-    .stSelectbox > div {
-        max-width: 300px;
-        margin: 0 auto;
-        border: 2px solid #EE4D2D;
-        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -156,15 +140,15 @@ if USAR_DADOS_REAIS:
     try:
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_real_data()
     except Exception as e:
-        st.sidebar.error(f"Erro ao carregar dados reais: {e}")
+        st.sidebar.error(f"Erro na conexão: {e}")
         df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 else:
     st.sidebar.warning("Usando dados simulados.")
     df_activity, df_packed, df_idle, df_sla, df_prod, df_dmo = load_mock_data()
 
 st.sidebar.title("Opções")
-st.sidebar.info("Utilize este espaço para filtros secundários ou navegação futura.")
 
+# Limpeza e filtro de data para a barra lateral
 df_prod['data'] = df_prod['data'].fillna('Sem Data').astype(str)
 datas_disponiveis = sorted([d for d in df_prod['data'].unique() if d != 'Sem Data' and d.strip() != ''], reverse=True)
 
@@ -174,50 +158,37 @@ else:
     st.sidebar.warning("Nenhuma data encontrada na aba prod.")
     data_selecionada = "Nenhuma"
 
-# Adding Cockpit to top right using CSS absolute positioning
-st.markdown("""
-    <style>
-        .cockpit-title {
-            position: absolute;
-            top: -50px;
-            right: 10px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #777;
-            letter-spacing: 2px;
-        }
-    </style>
-    <div class="cockpit-title">COCKPIT</div>
-""", unsafe_allow_html=True)
+st.sidebar.info("Utilize este espaço para filtros secundários ou navegação futura.")
 
-st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
-st.markdown("<br><br>", unsafe_allow_html=True)
+# Topo: COCKPIT e SHIPPING usando colunas para garantir posicionamento correto
+col_topo1, col_topo2, col_topo3 = st.columns([1, 2, 1])
+with col_topo2:
+    st.markdown('<h1 class="shopee-title">SHIPPING</h1>', unsafe_allow_html=True)
+with col_topo3:
+    st.markdown('<div style="text-align: right; color: #777; font-weight: bold; font-size: 1.5rem; letter-spacing: 2px; margin-top: 10px;">COCKPIT</div>', unsafe_allow_html=True)
 
 df_prod_filtered = df_prod[df_prod['data'] == data_selecionada]
 
 # SOMA DO THP
 thp_total = pd.to_numeric(df_prod_filtered['total_packing'], errors='coerce').sum()
 
-# CALCULO DA META (Soma da coluna D da aba DMO, linhas 16 a 25. O Pandas usa índice 0, então 15 a 24)
+# CALCULO DA META (DMO D16:D25)
 try:
     if not df_dmo.empty and len(df_dmo) >= 25:
-        # Pega a coluna D (índice 3, assumindo A=0, B=1, C=2, D=3)
-        # Pode variar dependendo de como usecols leu. Vou assumir a 4ª coluna real disponível.
         coluna_meta = df_dmo.columns[3] if len(df_dmo.columns) > 3 else df_dmo.columns[-1]
         meta_dia = pd.to_numeric(df_dmo[coluna_meta].iloc[15:25], errors='coerce').sum()
     else:
-        meta_dia = 20000 # Fallback 
+        meta_dia = 20000 
 except:
     meta_dia = 20000
 
 if meta_dia == 0 or pd.isna(meta_dia):
-    meta_dia = 20000 # Prevent division by zero or weird charts
+    meta_dia = 20000 
 
-# Outras métricas
 pendentes = len(df_sla[df_sla['last_status'] == 'SOC_Packing'])
 headcount = df_prod_filtered['operador'].nunique() if not df_prod_filtered.empty else 0
 
-col_met1, col_met_principal, col_met3 = st.columns([1, 1.8, 1])
+col_met1, col_met_principal, col_met3 = st.columns([1, 1.5, 1])
 
 with col_met1:
     st.metric("Operadores (HC)", f"{headcount}")
@@ -233,20 +204,30 @@ col_graf1, col_graf2 = st.columns(2)
 with col_graf1:
     st.subheader("🔥 Top 5 Produtividade (Packing)")
     if not df_prod_filtered.empty:
-        df_prod_chart = df_prod_filtered.copy()
-        # Force numeric, replacing errors with NaN, then drop NaNs
-        df_prod_chart['total_packing'] = pd.to_numeric(df_prod_chart['total_packing'], errors='coerce')
-        df_prod_chart = df_prod_chart.dropna(subset=['total_packing'])
-        df_prod_chart = df_prod_chart[df_prod_chart['total_packing'] > 0]
-        
-        if not df_prod_chart.empty:
-            top5 = df_prod_chart.nlargest(5, 'total_packing')
-            fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
-                         text='total_packing', color_discrete_sequence=['#EE4D2D'])
-            fig1.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="THP", yaxis_title="")
-            st.plotly_chart(fig1, use_container_width=True)
-        else:
-            st.info("Todos os valores de total_packing são zero ou inválidos para esta data.")
+        try:
+            df_prod_chart = df_prod_filtered.copy()
+            
+            # Garantir que a coluna name exista, se não usar operador
+            if 'name' not in df_prod_chart.columns:
+                df_prod_chart['name'] = df_prod_chart.get('operador', 'Desconhecido')
+            
+            # Limpeza rigorosa para evitar o ValueError do Plotly
+            df_prod_chart['total_packing'] = pd.to_numeric(df_prod_chart['total_packing'], errors='coerce')
+            df_prod_chart['name'] = df_prod_chart['name'].astype(str)
+            df_prod_chart = df_prod_chart.dropna(subset=['total_packing'])
+            df_prod_chart = df_prod_chart[df_prod_chart['total_packing'] > 0]
+            
+            if not df_prod_chart.empty:
+                top5 = df_prod_chart.nlargest(5, 'total_packing')
+                # text_auto preenche as barras sem dar conflito de dados
+                fig1 = px.bar(top5, x='total_packing', y='name', orientation='h', 
+                             text_auto='.0f', color_discrete_sequence=['#EE4D2D'])
+                fig1.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="THP", yaxis_title="")
+                st.plotly_chart(fig1, use_container_width=True)
+            else:
+                st.info("Valores de total_packing são zero ou inválidos para esta data.")
+        except Exception as e:
+            st.error(f"Não foi possível gerar o gráfico Top 5. Erro nos dados: {e}")
     else:
         st.info("Sem dados para listar o ranking.")
 
